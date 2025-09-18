@@ -10,6 +10,9 @@ import pyjokes
 import subprocess
 import time as t
 import openai
+import sys
+import threading
+from PyQt5 import QtWidgets, QtCore
 
 # Инициализация голосового движка
 engine = pyttsx3.init()
@@ -83,14 +86,13 @@ def takecommand() -> str:
         speak("Ошибка сервиса распознавания")
         return None
 
-
 openai.api_key = "sk-mnopabcd1234efghmnopabcd1234efghmnopabcd"
 
 def ask_ai(prompt: str) -> str:
     """Запрос к ИИ (ChatGPT)"""
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # или "gpt-4" если доступно
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=150,
             temperature=0.7
@@ -98,7 +100,6 @@ def ask_ai(prompt: str) -> str:
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"Ошибка обращения к ИИ: {e}"
-
 
 def create_text_file() -> None:
     """Создание текстового файла"""
@@ -216,7 +217,7 @@ def move_mouse_by_voice_loop() -> None:
         speak(f"Курсор перемещён на {step} пикселей")
 
 def type_text_by_voice() -> None:
-    # Ввод текста с клавиатуры по голосу
+    """Ввод текста с клавиатуры по голосу"""
     speak("Что напечатать?")
     text = takecommand()
     if text:
@@ -256,113 +257,219 @@ def system_command(command: str) -> None:
         speak("Перевожу компьютер в режим сна")
         os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
 
-# Основной цикл программы
-if __name__ == "__main__":
-    wishme()
+def process_command(query):
+    """Обработка голосовых команд"""
+    if not query:
+        return "Не удалось распознать команду"
 
-    while True:
+    # Используем match-case с условиями
+    match query:
+        case query if any(word in query for word in ["дата", "какое сегодня число", "напомни дату"]):
+            date()
+            return "Дата озвучена"
+
+        case query if any(word in query for word in ["время", "час", "который час"]):
+            time()
+            return "Время озвучено"
+
+        case query if any(word in query for word in ["создай файл", "создать файл", "новый файл"]):
+            create_text_file()
+            return "Создание файла"
+
+        # Веб-сайты
+        case query if any(word in query for word in ["открой ютуб", "ютуб", "YouTube"]):
+            open_website("https://youtube.com", "YouTube")
+            return "YouTube открыт"
+        
+        case query if any(word in query for word in ["открой гугл", "google", "гугл"]):
+            open_website("https://google.com", "Google")
+            return "Google открыт"
+        
+        case query if any(word in query for word in ["открой вк", "вконтакте"]):
+            open_website("https://vk.com", "ВКонтакте")
+            return "ВКонтакте открыт"
+        
+        case query if any(word in query for word in ["открой почту", "почта"]):
+            open_website("https://gmail.com", "Gmail")
+            return "Gmail открыт"
+
+        # Приложения
+        case query if any(word in query for word in ["открой блокнот", "блокнот"]):
+            open_application("блокнот")
+            return "Блокнот запущен"
+        
+        case query if any(word in query for word in ["открой калькулятор", "калькулятор"]):
+            open_application("калькулятор")
+            return "Калькулятор запущен"
+        
+        case query if any(word in query for word in ["открой paint", "пайнт"]):
+            open_application("пайнт")
+            return "Paint запущен"
+
+        # Ввод текста с клавиатуры
+        case query if any(word in query for word in ["напечатай текст", "введи текст", "напиши текст"]):
+            type_text_by_voice()
+            return "Ввод текста"
+
+        # Управление курсором мыши
+        case query if any(word in query for word in ["перемести курсор", "курсор", "курс","мышь", "мыш"]):
+            move_mouse_by_voice_loop()
+            return "Управление курсором"
+
+        # Искусственный интеллект
+        case query if any(word in query for word in ["искусственный интеллект", "чат гпт", "чатгпт"]):
+            speak("Задайте вопрос для искусственного интеллекта")
+            ai_query = takecommand()
+            if ai_query:
+                answer = ask_ai(ai_query)
+                speak(answer)
+                return "Ответ ИИ получен"
+            else:
+                speak("Не удалось распознать вопрос")
+                return "Не удалось распознать вопрос"
+    
+        # Поиск
+        case query if "википедия" in query:
+            search_query = query.replace("википедия", "").strip()
+            if search_query:
+                search_wikipedia(search_query)
+                return "Поиск в Википедии выполнен"
+            else:
+                speak("Что искать в Википедии?")
+                return "Не указан запрос для Википедии"
+
+        # Музыка
+        case query if any(word in query for word in ["включи музыку", "музыка", "песня"]):
+            play_music()
+            return "Музыка включена"
+
+        # Шутки
+        case query if any(word in query for word in ["шутка", "пошути", "расскажи шутку"]):
+            tell_joke()
+            return "Шутка рассказана"
+        
+        case query if any(word in query for word in ["сделай скриншот", "скриншот", "снимок экрана"]):
+            take_screenshot()
+            return "Скриншот сделан"
+        
+        # Word   
+        case query if any(word in query for word in ["открой word", "ворд", "word"]):
+            open_application("word")
+            return "Word запущен"
+        
+        # PowerPoint
+        case query if any(word in query for word in ["открой powerpoint", "powerpoint", "презентация"]):
+            open_application("powerpoint")
+            return "PowerPoint запущен"
+        
+        # Системные команды
+        case query if any(word in query for word in ["выключи компьютер", "завершение работы"]):
+            system_command("выключи компьютер")
+            return "Выключение компьютера"
+        
+        case query if any(word in query for word in ["перезагрузи компьютер", "перезагрузка"]):
+            system_command("перезагрузи компьютер")
+            return "Перезагрузка компьютера"
+        
+        case query if any(word in query for word in ["режим сна", "сон", "спящий режим"]):
+            system_command("режим сна")
+            return "Режим сна активирован"
+
+        # Прощание
+        case query if any(word in query for word in ["стоп", "выход", "закройся", "пока", "отключись"]):
+            speak("До свидания! Буду рад помочь снова")
+            return "Выход из программы"
+
+        case _:
+            speak("Не понял команду. Повторите, пожалуйста")
+            return "Неизвестная команда"
+
+class VoiceAssistantWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Voice Assistant")
+        self.setGeometry(100, 100, 800, 600)
+        
+        # Create a central widget
+        self.central_widget = QtWidgets.QWidget(self)
+        self.setCentralWidget(self.central_widget)
+        
+        # Layout
+        self.layout = QtWidgets.QVBoxLayout(self.central_widget)
+        
+        # Add a label for status
+        self.status_label = QtWidgets.QLabel("Добро пожаловать в голосовой помощник!", self)
+        self.status_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.layout.addWidget(self.status_label)
+        
+        # Add text area for command history
+        self.history_text = QtWidgets.QTextEdit(self)
+        self.history_text.setReadOnly(True)
+        self.layout.addWidget(self.history_text)
+        
+        # Add buttons
+        self.button_layout = QtWidgets.QHBoxLayout()
+        
+        self.start_button = QtWidgets.QPushButton("Начать прослушивание", self)
+        self.start_button.clicked.connect(self.start_listening)
+        self.button_layout.addWidget(self.start_button)
+        
+        self.exit_button = QtWidgets.QPushButton("Выход", self)
+        self.exit_button.clicked.connect(self.close)
+        self.button_layout.addWidget(self.exit_button)
+        
+        self.layout.addLayout(self.button_layout)
+        
+        # Initialize assistant
+        self.assistant_thread = None
+        wishme()
+        self.update_history("Голосовой помощник инициализирован и готов к работе")
+
+    def start_listening(self):
+        """Запуск прослушивания в отдельном потоке"""
+        self.status_label.setText("Слушаю...")
+        self.start_button.setEnabled(False)
+        
+        # Запуск в отдельном потоке чтобы не блокировать GUI
+        self.assistant_thread = threading.Thread(target=self.process_voice_command)
+        self.assistant_thread.daemon = True
+        self.assistant_thread.start()
+
+    def process_voice_command(self):
+        """Обработка голосовой команды"""
         query = takecommand()
         
-        if not query:
-            continue
-
-        # Используем match-case с условиями
-        match query:
-            case query if any(word in query for word in ["дата", "какое сегодня число", "напомни дату"]):
-                date()
-            case query if any(word in query for word in ["время", "час", "который час"]):
-                time()
-                speak(time())
-
-            case query if any(word in query for word in ["создай файл", "создать файл", "новый файл"]):
-                create_text_file()
-
-            # Веб-сайты
-            case query if any(word in query for word in ["открой ютуб", "ютуб", "YouTube"]):
-                open_website("https://youtube.com", "YouTube")
-            
-            case query if any(word in query for word in ["открой гугл", "google", "гугл"]):
-                open_website("https://google.com", "Google")
-                speak("Гугл открыт")
-                print("Гугл открыт")
-            
-            case query if any(word in query for word in ["открой вк", "вконтакте"]):
-                open_website("https://vk.com", "ВКонтакте")
-            
-            case query if any(word in query for word in ["открой почту", "почта"]):
-                open_website("https://gmail.com", "Gmail")
-
-            # Приложения
-            case query if any(word in query for word in ["открой блокнот", "блокнот"]):
-                open_application("блокнот")
-            
-            case query if any(word in query for word in ["открой калькулятор", "калькулятор"]):
-                open_application("калькулятор")
-            
-            case query if any(word in query for word in ["открой paint", "пайнт"]):
-                open_application("пайнт")
-
-            # Ввод текста с клавиатуры
-            case query if any(word in query for word in ["напечатай текст", "введи текст", "напиши текст"]):
-                type_text_by_voice()
-
-            # Управление курсором мыши
-            case query if any(word in query for word in ["перемести курсор", "курсор", "курс","мышь", "мыш"]):
-                move_mouse_by_voice_loop()
-
-            # Искусственный интеллект
-            case query if any(word in query for word in ["искусственный интеллект", "чат гпт", "чатгпт"]):
-                speak("Задайте вопрос для искусственного интеллекта")
-                ai_query = takecommand()
-                if ai_query:
-                    answer = ask_ai(ai_query)
-                    speak(answer)
-                else:
-                    speak("Не удалось распознать вопрос")
+        if query:
+            self.update_history(f"Распознано: {query}")
+            result = process_command(query)
+            self.update_history(f"Результат: {result}")
+        else:
+            self.update_history("Не удалось распознать команду")
         
-            # Поиск
-            case query if "википедия" in query:
-                search_query = query.replace("википедия", "").strip()
-                if search_query:
-                    search_wikipedia(search_query)
-                else:
-                    speak("Что искать в Википедии?")
+        # Включить кнопку обратно после завершения
+        self.start_button.setEnabled(True)
+        self.status_label.setText("Готов к прослушиванию")
 
-            # Музыка
-            case query if any(word in query for word in ["включи музыку", "музыка", "песня"]):
-                play_music()
+    def update_history(self, message):
+        """Обновление истории команд"""
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        self.history_text.append(f"[{timestamp}] {message}")
+        
+        # Прокрутка к нижней части текстового поля
+        cursor = self.history_text.textCursor()
+        cursor.movePosition(cursor.End)
+        self.history_text.setTextCursor(cursor)
 
-            # Шутки
-            case query if any(word in query for word in ["шутка", "пошути", "расскажи шутку"]):
-                tell_joke()
-            
-            case query if any(word in query for word in ["сделай скриншот", "скриншот", "снимок экрана"]):
-                take_screenshot()
-            
-            # Word   
-            case query if any(word in query for word in ["открой word", "ворд", "word"]):
-                open_application("word")
-            
-            # PowerPoint
-            case query if any(word in query for word in ["открой powerpoint", "powerpoint", "презентация"]):
-                open_application("powerpoint")
-            
-            # Системные команды
-            case query if any(word in query for word in ["выключи компьютер", "завершение работы"]):
-                system_command("выключи компьютер")
-            
-            case query if any(word in query for word in ["перезагрузи компьютер", "перезагрузка"]):
-                system_command("перезагрузи компьютер")
-            
-            case query if any(word in query for word in ["режим сна", "сон", "спящий режим"]):
-                system_command("режим сна")
+    def closeEvent(self, event):
+        """Обработка закрытия окна"""
+        speak("До свидания!")
+        event.accept()
 
-            # Прощание
-            case query if any(word in query for word in ["стоп", "выход", "закройся", "пока", "отключись"]):
-                speak("До свидания! Буду рад помочь снова")
-                break
+def main():
+    app = QtWidgets.QApplication(sys.argv)
+    window = VoiceAssistantWindow()
+    window.show()
+    sys.exit(app.exec_())
 
-            case _:
-                print("Не понял команду. Повторите, пожалуйста")
-                speak("Не понял команду. Повторите, пожалуйста")
-                t.sleep(1)
+if __name__ == "__main__":
+    main()
