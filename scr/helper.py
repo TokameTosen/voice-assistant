@@ -13,8 +13,9 @@ import openai
 import sys
 import threading
 import re
+import queue
 from PyQt5 import QtWidgets, QtCore, QtGui
-
+ 
 # Инициализация голосового движка
 engine = pyttsx3.init()
 voices = engine.getProperty('voices')
@@ -26,11 +27,26 @@ for voice in voices:
 # Скорость речи
 engine.setProperty('rate', 180)
 
+speech_queue = queue.Queue()
+
+def speech_worker():
+    """Поток для озвучивания сообщений"""
+    while True:
+        text = speech_queue.get()
+        if text is None:
+            break
+        print(text)
+        engine.say(text)
+        engine.runAndWait()
+        speech_queue.task_done()
+
+# Запуск потока озвучки
+speech_thread = threading.Thread(target=speech_worker, daemon=True)
+speech_thread.start()
+
 def speak(audio) -> None:
-    """Произносит текст"""
-    print(audio)
-    engine.say(audio)
-    engine.runAndWait()
+    """Произносит текст (через очередь)"""
+    speech_queue.put(audio)
 
 def update_status(self, message):
     """Обновление статуса в главном окне"""
@@ -106,6 +122,16 @@ def ask_ai(prompt: str) -> str:
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"Ошибка обращения к ИИ: {e}"
+
+def left_mouse_click() -> None:
+    """Нажать левую кнопку мыши"""
+    pyautogui.click()
+    speak("Левый клик выполнен")
+
+def right_mouse_click() -> None:
+    """Нажать правую кнопку мыши"""
+    pyautogui.rightClick()
+    speak("Правый клик выполнен")
 
 def create_text_file() -> None:
     """Создание текстового файла"""
@@ -206,15 +232,15 @@ def move_mouse_by_voice_loop() -> None:
         if match:
             step = int(match.group(1))
 
-        if "вверх" in direction:
+        if any(word in direction for word in ["вверх", "верх"]):
             pyautogui.moveTo(x, max(0, y - step))
-        elif "вниз" in direction:
+        elif any(word in direction for word in ["вниз", "низ"]):
             pyautogui.moveTo(x, min(screen_height, y + step))
-        elif "влево" in direction:
+        elif any(word in direction for word in ["влево", "лево", "лева"]):
             pyautogui.moveTo(max(0, x - step), y)
-        elif "вправо" in direction:
+        elif any(word in direction for word in ["вправо", "право", "права"]):
             pyautogui.moveTo(min(screen_width, x + step), y)
-        elif "центр" in direction or "центр экрана" in direction:
+        elif any(word in direction for word in ["центр", "центр экрана", "середина", "середина экрана"]):
             pyautogui.moveTo(screen_width // 2, screen_height // 2)
         else:
             speak("Не удалось распознать направление")
@@ -277,6 +303,14 @@ def process_command(query):
             time()
             return "Время озвучено"
 
+        case query if any(word in query for word in ["левый клик", "нажми левую кнопку", "кликни мышью", "клик"]):
+            left_mouse_click()
+            return "Левый клик мыши"
+        
+        case query if any(word in query for word in ["правый клик", "нажми правую кнопку", "правой кнопкой", "правая кнопка"]):
+            right_mouse_click()
+            return "Правый клик мыши"
+        
         case query if any(word in query for word in ["создай файл", "создать файл", "новый файл"]):
             create_text_file()
             return "Создание файла"
@@ -574,11 +608,12 @@ class VoiceAssistantWindow(QtWidgets.QMainWindow):
         cursor.movePosition(cursor.End)
         self.history_text.setTextCursor(cursor)
 
-    def closeEvent(self, event):
-        """Обработка закрытия окна"""
-        speak("До свидания!")
-        self.update_history("📴 Программа завершена")
-        event.accept()
+def closeEvent(self, event):
+    """Обработка закрытия окна"""
+    speak("До свидания!")
+    self.update_history("📴 Программа завершена")
+    speech_queue.put(None)  # Завершить поток озвучки
+    event.accept()
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
