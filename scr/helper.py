@@ -12,7 +12,8 @@ import time as t
 import openai
 import sys
 import threading
-from PyQt5 import QtWidgets, QtCore
+import re
+from PyQt5 import QtWidgets, QtCore, QtGui
 
 # Инициализация голосового движка
 engine = pyttsx3.init()
@@ -30,6 +31,11 @@ def speak(audio) -> None:
     print(audio)
     engine.say(audio)
     engine.runAndWait()
+
+def update_status(self, message):
+    """Обновление статуса в главном окне"""
+    self.status_label.setText(message)
+    QtCore.QCoreApplication.processEvents()  # Принудительное обновление GUI
 
 def time() -> None:
     """Скажи текущее время"""
@@ -86,7 +92,7 @@ def takecommand() -> str:
         speak("Ошибка сервиса распознавания")
         return None
 
-openai.api_key = "sk-mnopabcd1234efghmnopabcd1234efghmnopabcd"
+openai.api_key = ""
 
 def ask_ai(prompt: str) -> str:
     """Запрос к ИИ (ChatGPT)"""
@@ -182,7 +188,7 @@ def play_music() -> None:
         speak("Папка Музыка не найдена")
 
 def move_mouse_by_voice_loop() -> None:
-    """Многократное перемещение курсора мыши по голосу, пока не скажут 'стоп'"""
+    """Многократное перемещение курсором мыши по голосу, пока не скажут 'стоп'"""
     speak("Режим управления курсором активирован. Говорите направление и расстояние, например: 'вверх на 200'. Для выхода скажите 'стоп'.")
     while True:
         direction = takecommand()
@@ -196,7 +202,6 @@ def move_mouse_by_voice_loop() -> None:
         screen_width, screen_height = pyautogui.size()
         step = 100  # значение по умолчанию
 
-        import re
         match = re.search(r"(\d+)", direction)
         if match:
             step = int(match.group(1))
@@ -387,8 +392,8 @@ def process_command(query):
 class VoiceAssistantWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Voice Assistant")
-        self.setGeometry(100, 100, 800, 600)
+        self.setWindowTitle("Голосовой помощник")
+        self.setGeometry(100, 100, 900, 700)
         
         # Create a central widget
         self.central_widget = QtWidgets.QWidget(self)
@@ -397,25 +402,87 @@ class VoiceAssistantWindow(QtWidgets.QMainWindow):
         # Layout
         self.layout = QtWidgets.QVBoxLayout(self.central_widget)
         
+        # Установка фонового изображения
+        self.set_background()
+        
         # Add a label for status
         self.status_label = QtWidgets.QLabel("Добро пожаловать в голосовой помощник!", self)
         self.status_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.status_label.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 18px;
+                font-weight: bold;
+                background-color: rgba(0, 0, 0, 150);
+                padding: 15px;
+                border-radius: 15px;
+                margin: 10px;
+            }
+        """)
         self.layout.addWidget(self.status_label)
         
         # Add text area for command history
         self.history_text = QtWidgets.QTextEdit(self)
         self.history_text.setReadOnly(True)
+        self.history_text.setStyleSheet("""
+            QTextEdit {
+                background-color: rgba(255, 255, 255, 200);
+                border: 2px solid #3498db;
+                border-radius: 10px;
+                padding: 10px;
+                font-size: 16px;
+            }
+        """)
         self.layout.addWidget(self.history_text)
         
         # Add buttons
         self.button_layout = QtWidgets.QHBoxLayout()
         
-        self.start_button = QtWidgets.QPushButton("Начать прослушивание", self)
+        self.start_button = QtWidgets.QPushButton("🎤 Начать прослушивание", self)
         self.start_button.clicked.connect(self.start_listening)
+        self.start_button.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                border: none;
+                padding: 15px;
+                font-size: 16px;
+                font-weight: bold;
+                border-radius: 8px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #219a52;
+            }
+            QPushButton:pressed {
+                background-color: #1e8449;
+            }
+            QPushButton:disabled {
+                background-color: #7f8c8d;
+            }
+        """)
         self.button_layout.addWidget(self.start_button)
         
-        self.exit_button = QtWidgets.QPushButton("Выход", self)
+        self.exit_button = QtWidgets.QPushButton("🚪 Выход", self)
         self.exit_button.clicked.connect(self.close)
+        self.exit_button.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;
+                color: white;
+                border: none;
+                padding: 15px;
+                font-size: 16px;
+                font-weight: bold;
+                border-radius: 8px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #c0392b;
+            }
+            QPushButton:pressed {
+                background-color: #a93226;
+            }
+        """)
         self.button_layout.addWidget(self.exit_button)
         
         self.layout.addLayout(self.button_layout)
@@ -425,10 +492,57 @@ class VoiceAssistantWindow(QtWidgets.QMainWindow):
         wishme()
         self.update_history("Голосовой помощник инициализирован и готов к работе")
 
+    def set_background(self):
+        """Установка фонового изображения"""
+        try:
+            # Попробуйте различные пути к изображениям
+            possible_paths = [
+                "background.jpg",
+                "background.png",
+                "wallpaper.jpg",
+                "wallpaper.png",
+                "фон.jpg",
+                "фон.png"
+            ]
+            
+            background_path = None
+            for path in possible_paths:
+                if os.path.exists(path):
+                    background_path = path
+                    break
+            
+            if background_path:
+                self.setStyleSheet(f"""
+                    VoiceAssistantWindow {{
+                        background-image: url({background_path});
+                        background-position: center;
+                        background-repeat: no-repeat;
+                        background-attachment: fixed;
+                        background-size: cover;
+                    }}
+                """)
+            else:
+                # Градиентный фон если изображение не найдено
+                self.setStyleSheet("""
+                    VoiceAssistantWindow {
+                        background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+                                                  stop: 0 #667eea, stop: 1 #764ba2);
+                    }
+                """)
+        except Exception as e:
+            print(f"Ошибка установки фона: {e}")
+            # Простой фон в случае ошибки
+            self.setStyleSheet("""
+                VoiceAssistantWindow {
+                    background-color: #2c3e50;
+                }
+            """)
+
     def start_listening(self):
         """Запуск прослушивания в отдельном потоке"""
-        self.status_label.setText("Слушаю...")
+        self.status_label.setText("🎤 Слушаю...")
         self.start_button.setEnabled(False)
+        self.update_history("Начато прослушивание...")
         
         # Запуск в отдельном потоке чтобы не блокировать GUI
         self.assistant_thread = threading.Thread(target=self.process_voice_command)
@@ -440,15 +554,15 @@ class VoiceAssistantWindow(QtWidgets.QMainWindow):
         query = takecommand()
         
         if query:
-            self.update_history(f"Распознано: {query}")
+            self.update_history(f"🎤 Распознано: {query}")
             result = process_command(query)
-            self.update_history(f"Результат: {result}")
+            self.update_history(f"✅ {result}")
         else:
-            self.update_history("Не удалось распознать команду")
+            self.update_history("❌ Не удалось распознать команду")
         
         # Включить кнопку обратно после завершения
         self.start_button.setEnabled(True)
-        self.status_label.setText("Готов к прослушиванию")
+        self.status_label.setText("✅ Готов к прослушиванию")
 
     def update_history(self, message):
         """Обновление истории команд"""
@@ -463,10 +577,15 @@ class VoiceAssistantWindow(QtWidgets.QMainWindow):
     def closeEvent(self, event):
         """Обработка закрытия окна"""
         speak("До свидания!")
+        self.update_history("📴 Программа завершена")
         event.accept()
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
+    
+    # Установка стиля приложения
+    app.setStyle('Fusion')
+    
     window = VoiceAssistantWindow()
     window.show()
     sys.exit(app.exec_())
