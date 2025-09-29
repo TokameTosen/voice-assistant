@@ -1,6 +1,6 @@
 # Voice Assistant Application
 
-This project is a voice assistant application that utilizes voice recognition and speech synthesis to interact with users. It features a graphical user interface (GUI) for ease of use.
+This project is a Russian voice assistant application that utilizes voice recognition and speech synthesis to interact with users. It features a graphical user interface (GUI) for ease of use.
 
 ## Project Structure
 
